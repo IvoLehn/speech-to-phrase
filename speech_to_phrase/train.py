@@ -14,7 +14,7 @@ from .const import Settings, TrainingError, WordCasing
 from .g2p import LexiconDatabase
 from .hass_api import Things
 from .hassil_fst import Fst, G2PInfo, intents_to_fst
-from .lang_sentences import LanguageData, load_shared_lists
+from .lang_sentences import load_shared_lists
 from .models import MODELS, Model, ModelType, download_model
 from .train_coqui_stt import train_coqui_stt
 from .train_kaldi import train_kaldi
@@ -40,6 +40,12 @@ async def train(
     If the model does not exist, it will be downloaded.
     If the previous training information is identical, training will be skipped.
     """
+    if not settings.template_paths(model.language, model.language_family):
+        raise TrainingError(
+            f"No sentence templates found for language {model.language} "
+            f"in {settings.templates_dirs}"
+        )
+
     model_dir = settings.model_data_dir(model.id)
     if not model_dir.exists():
         await download_model(model, settings)
@@ -95,10 +101,22 @@ async def train(
 
 def _create_intents(model: Model, settings: Settings, things: Things) -> Intents:
     """Create intents from sentences and things from Home Assistant."""
-    sentences_path = settings.sentences / f"{model.sentences_language}.yaml"
-    with open(sentences_path, "r", encoding="utf-8") as sentences_file:
-        lang_data = LanguageData.from_dict(yaml.load(sentences_file))
-        sentences_dict = lang_data.to_intents_dict()
+    template_paths = settings.template_paths(model.language, model.language_family)
+    if not template_paths:
+        raise TrainingError(
+            f"No sentence templates found for language {model.language} "
+            f"in {settings.templates_dirs}"
+        )
+
+    sentences_dict = {
+        "language": model.sentences_language,
+        "intents": {},
+        "lists": {},
+    }
+    for template_path in template_paths:
+        _LOGGER.debug("Loading sentence templates from %s", template_path)
+        with open(template_path, "r", encoding="utf-8") as template_file:
+            merge_dict(sentences_dict, yaml.load(template_file) or {})
 
     lists_dict = sentences_dict.get("lists", {})
     lists_dict.update(things.to_lists_dict())
@@ -117,50 +135,17 @@ def _create_intents(model: Model, settings: Settings, things: Things) -> Intents
         }
         sentences_dict["intents"] = intents_dict
 
-    # Custom sentences
-    for custom_sentences_dir in settings.custom_sentences_dirs:
-        dir_for_language = custom_sentences_dir / model.language
-        if not dir_for_language.is_dir():
-            # Try language family
-            dir_for_language = custom_sentences_dir / model.language_family
-
-            if not dir_for_language.is_dir():
-                continue
-
-        for custom_sentences_path in sorted(dir_for_language.glob("*.yaml")):
-            _LOGGER.debug("Loading custom sentences from %s", custom_sentences_path)
-
-            with open(
-                custom_sentences_path, "r", encoding="utf-8"
-            ) as custom_sentences_file:
-                merge_dict(sentences_dict, yaml.load(custom_sentences_file) or {})
-
     # Clean up lists that were wildcards but now have values
     for list_info in lists_dict.values():
         if "values" in list_info:
             list_info.pop("wildcard", None)
-
     lang_intents = Intents.from_dict(sentences_dict)
-    tr_lists = lang_data.add_transformed_slot_lists(lang_intents.slot_lists)
 
     # Write YAML with training sentences (includes HA lists, triggers, etc.)
     training_sentences_path = settings.training_sentences_path(model.id)
     with open(
         training_sentences_path, "w", encoding="utf-8"
     ) as training_sentences_file:
-        # Add transformed lists to debug YAML
-        for tr_list_name, tr_list in tr_lists.items():
-            lists_dict[tr_list_name] = {
-                "values": [
-                    {
-                        "in": value.value_out,
-                        "out": value.value_out,
-                        "context": value.context or {},
-                        "metadata": value.metadata or {},
-                    }
-                    for value in tr_list.values
-                ]
-            }
         yaml_output.dump(quote_strings(sentences_dict), training_sentences_file)
 
     _LOGGER.debug("Wrote debug YAML to %s", training_sentences_path)
@@ -193,28 +178,12 @@ def _create_intents_fst(
 def _get_sentences_hash(
     model: Model, settings: Settings, chunk_size: int = 8192
 ) -> str:
-    """Get a hash of sentences YAML files (builtin and custom)."""
+    """Get a hash of sentence template YAML files."""
     hasher = hashlib.sha256()
 
-    # Builtin sentences
-    sentences_path = settings.sentences / f"{model.sentences_language}.yaml"
-    with open(sentences_path, "rb") as sentences_file:
-        chunk = sentences_file.read(chunk_size)
-        hasher.update(chunk)
-
-    # Custom sentences
-    for custom_sentences_dir in settings.custom_sentences_dirs:
-        dir_for_language = custom_sentences_dir / model.language
-        if not dir_for_language.is_dir():
-            # Try language family
-            dir_for_language = custom_sentences_dir / model.language_family
-
-            if not dir_for_language.is_dir():
-                continue
-
-        for custom_sentences_path in sorted(dir_for_language.glob("*.yaml")):
-            with open(custom_sentences_path, "rb") as custom_sentences_file:
-                chunk = custom_sentences_file.read(chunk_size)
+    for template_path in settings.template_paths(model.language, model.language_family):
+        with open(template_path, "rb") as template_file:
+            while chunk := template_file.read(chunk_size):
                 hasher.update(chunk)
 
     return hasher.hexdigest()
@@ -257,7 +226,7 @@ async def main() -> None:
         models_dir=Path(args.models_dir),
         train_dir=Path(args.train_dir),
         tools_dir=Path(args.tools_dir),
-        custom_sentences_dirs=[],
+        templates_dirs=[],
         hass_token="",
         hass_websocket_uri="",
         retrain_on_connect=False,

@@ -15,7 +15,7 @@ SETTINGS = Settings(
     hass_token="",
     hass_websocket_uri="",
     retrain_on_connect=False,
-    custom_sentences_dirs=[TESTS_DIR / "custom_sentences"],
+    templates_dirs=[TESTS_DIR / "templates"],
 )
 
 TEST_LANGUAGES = [lang.value for lang in Language]

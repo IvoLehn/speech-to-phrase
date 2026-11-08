@@ -61,7 +61,7 @@ async def main() -> None:
         models_dir=Path(args.models_dir),
         train_dir=Path(args.train_dir),
         tools_dir=Path(args.tools_dir),
-        custom_sentences_dirs=[],
+        templates_dirs=[],
         hass_token="",
         hass_websocket_uri="",
         retrain_on_connect=False,

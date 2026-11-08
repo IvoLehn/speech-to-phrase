@@ -1,0 +1,27 @@
+services:
+  stp:
+    image: stp
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stp
+    restart: unless-stopped
+    labels:
+      watchman.tag.pattern: '{v}.{v}.{v}'
+    environment:
+      TZ: Europe/Berlin
+    volumes:
+      - /opt/stp/models:/models
+      - /opt/stp/train:/train
+      - /opt/stp/sentences/de:/sentences/de
+    ports:
+      - 10300:10300
+    command:
+      - '--hass-websocket-uri'
+      - 'ws://srv-app-01/api/websocket'
+      - '--hass-token'
+      - 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxNjJjYTQ0NTAzYzI0YThmOTlmODNmYzQ2NWU2MTdkMCIsImlhdCI6MTc5MzM3NDM1MSwiZXhwIjoyMTA4NzM0MzUxfQ.iD9n2A1e753WIXdE919jtCZjAWc0YDGI0kcB66ARAMw'
+      - '--templates-dir'
+      - '/sentences'
+      - '--retrain-on-start'
+      - '--debug'

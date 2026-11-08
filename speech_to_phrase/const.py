@@ -62,11 +62,10 @@ class Settings:
         models_dir: Union[str, Path],
         train_dir: Union[str, Path],
         tools_dir: Union[str, Path],
-        custom_sentences_dirs: List[Union[str, Path]],
+        templates_dirs: List[Union[str, Path]],
         hass_token: str,
         hass_websocket_uri: str,
         retrain_on_connect: bool,
-        sentences_dir: Optional[Union[str, Path]] = None,
         shared_lists_path: Optional[Path] = None,
         default_language: str = Language.ENGLISH.value,
         volume_multiplier: float = 1.0,
@@ -75,23 +74,32 @@ class Settings:
         self.models_dir = Path(models_dir)
         self.train_dir = Path(train_dir)
         self.tools = SpeechTools.from_tools_dir(tools_dir)
-        self.custom_sentences_dirs = [Path(d) for d in custom_sentences_dirs]
+        self.templates_dirs = [Path(d) for d in templates_dirs]
         self.hass_token = hass_token
         self.hass_websocket_uri = hass_websocket_uri
         self.retrain_on_connect = retrain_on_connect
-
-        if not sentences_dir:
-            # Builtin sentences
-            sentences_dir = _MODULE_DIR / "sentences"
 
         if not shared_lists_path:
             shared_lists_path = _MODULE_DIR / "shared_lists.yaml"
 
         self.shared_lists_path = shared_lists_path
 
-        self.sentences = Path(sentences_dir)
         self.default_language = default_language
         self.volume_multiplier = volume_multiplier
+
+    def template_paths(self, language: str, language_family: str) -> List[Path]:
+        """Get template YAML files for a language."""
+        template_paths: List[Path] = []
+        for templates_dir in self.templates_dirs:
+            dir_for_language = templates_dir / language
+            if not dir_for_language.is_dir():
+                dir_for_language = templates_dir / language_family
+                if not dir_for_language.is_dir():
+                    continue
+
+            template_paths.extend(sorted(dir_for_language.glob("*.yaml")))
+
+        return template_paths
 
     def model_data_dir(self, model_id: str) -> Path:
         """Path to model data."""

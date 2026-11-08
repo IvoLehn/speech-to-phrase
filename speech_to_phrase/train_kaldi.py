@@ -394,28 +394,12 @@ async def _prepare_online_decoding(
 def _get_sentences_hash(
     model: Model, settings: Settings, chunk_size: int = 8192
 ) -> str:
-    """Get a hash of sentences YAML files (builtin and custom)."""
+    """Get a hash of sentence template YAML files."""
     hasher = hashlib.sha256()
 
-    # Builtin sentences
-    sentences_path = settings.sentences / f"{model.sentences_language}.yaml"
-    with open(sentences_path, "rb") as sentences_file:
-        chunk = sentences_file.read(chunk_size)
-        hasher.update(chunk)
-
-    # Custom sentences
-    for custom_sentences_dir in settings.custom_sentences_dirs:
-        dir_for_language = custom_sentences_dir / model.language
-        if not dir_for_language.is_dir():
-            # Try language family
-            dir_for_language = custom_sentences_dir / model.language_family
-
-            if not dir_for_language.is_dir():
-                continue
-
-        for custom_sentences_path in sorted(dir_for_language.glob("*.yaml")):
-            with open(custom_sentences_path, "rb") as custom_sentences_file:
-                chunk = custom_sentences_file.read(chunk_size)
+    for template_path in settings.template_paths(model.language, model.language_family):
+        with open(template_path, "rb") as template_file:
+            while chunk := template_file.read(chunk_size):
                 hasher.update(chunk)
 
     return hasher.hexdigest()

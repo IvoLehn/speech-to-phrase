@@ -33,9 +33,10 @@ async def main() -> None:
         "--models-dir", required=True, help="Directory with speech models"
     )
     parser.add_argument(
-        "--custom-sentences-dir",
+        "--templates-dir",
         action="append",
-        help="Directory with custom sentence directories for each language",
+        required=True,
+        help="Directory containing sentence template directories for each language",
     )
     # Home Assistant
     parser.add_argument(
@@ -84,7 +85,7 @@ async def main() -> None:
             models_dir=Path(args.models_dir),
             train_dir=Path(args.train_dir),
             tools_dir=Path(args.tools_dir),
-            custom_sentences_dirs=args.custom_sentences_dir or [],
+            templates_dirs=args.templates_dir,
             hass_token=args.hass_token,
             hass_websocket_uri=args.hass_websocket_uri,
             retrain_on_connect=args.retrain_on_connect,

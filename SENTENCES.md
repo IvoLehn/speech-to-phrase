@@ -238,6 +238,12 @@ Requires a [climate][] entity to be configured:
 | `it`     | qual è la temperatura?     |
 | `nl`     | wat is de temperatuur?     |
 
+Requires a [climate][] entity in the specified [area][]:
+
+| Language | Command                                         |
+|----------|-------------------------------------------------|
+| `de`     | Temperatur im `{area}` auf `{temperature}` Grad |
+
 
 Requires a [climate][] entity with the specific name or [alias][aliases]:
 

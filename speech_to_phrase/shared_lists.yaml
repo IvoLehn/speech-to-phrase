@@ -15,6 +15,12 @@ position:
     to: 100
     step: 10
 
+# climate
+temperature:
+  range:
+    from: 0
+    to: 100
+
 # timers
 seconds:
   range:
